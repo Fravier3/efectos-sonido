@@ -1,8 +1,9 @@
 'use strict';
-const CACHE = 'efectos-v1.0.0';
+const CACHE = 'efectos-v1.0.1';
 const PRECACHE = [
   './',
   './index.html',
+  './providers.js?v=1.0.1',
   './manifest.webmanifest',
   './favicon.png',
   './icons/icon-192.png',
@@ -19,7 +20,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('efectos-') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Efectos">
-<meta name="description" content="Busca y reproduce efectos de sonido libres de Openverse.">
+<meta name="description" content="Busca y reproduce efectos de sonido de Openverse e Internet Archive.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
@@ -171,11 +171,11 @@ nav button .count{position:absolute;top:2px;left:calc(50% + 8px);min-width:18px;
 <section class="sheet" id="sheet" aria-modal="true" role="dialog" aria-labelledby="sheetTitle"></section>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script src="providers.js?v=1.0.1"></script>
 <script>
 'use strict';
 /* ===== Constantes ===== */
-const APP_VERSION = '1.0.0';
-const API_URL = 'https://api.openverse.org/v1/audio/';
+const APP_VERSION = '1.0.1';
 const PAGE_SIZE = 20;
 const FAV_KEY = 'fx.favs.v1';
 const LOOP_KEY = 'fx.loop.v1';
@@ -252,6 +252,7 @@ const state = {
   query: '',
   page: 1,
   pageCount: 1,
+  provider: null,
   results: [],
   loading: false,
   error: null,          // {title, text, offline}
@@ -326,7 +327,7 @@ function setMediaSession(item) {
 const isFav = (id) => state.favs.some((f) => f.id === id);
 function slim(it) {
   return { id: it.id, title: it.title, url: it.url, creator: it.creator, duration: it.duration, license: it.license,
-    license_version: it.license_version, foreign_landing_url: it.foreign_landing_url, attribution: it.attribution, source: it.source };
+    license_version: it.license_version, license_url: it.license_url, foreign_landing_url: it.foreign_landing_url, attribution: it.attribution, source: it.source };
 }
 function toggleFav(item) {
   buzz(15);
@@ -351,20 +352,10 @@ function updateBadge() {
 }
 
 /* ===== Búsqueda (API Openverse) ===== */
-function cacheKey(q, page) { return 'fx.q.' + q.toLowerCase() + '|' + page; }
 async function fetchPage(q, page) {
-  const key = cacheKey(q, page);
-  try { const c = sessionStorage.getItem(key); if (c) return JSON.parse(c); } catch {}
-  const params = new URLSearchParams({ q, category: 'sound_effect', page_size: PAGE_SIZE, page });
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
-  let res;
-  try { res = await fetch(API_URL + '?' + params, { signal: ctrl.signal, headers: { Accept: 'application/json' } }); }
-  finally { clearTimeout(timer); }
-  if (res.status === 429) { const e = new Error('rate'); e.kind = 'rate'; throw e; }
-  if (res.status === 401 || res.status === 403) { const e = new Error('auth'); e.kind = 'auth'; throw e; }
-  if (!res.ok) { const e = new Error('http ' + res.status); e.kind = 'http'; throw e; }
-  const data = await res.json();
+  const key = 'fx.q.v2.' + q.toLowerCase() + '|' + page + '|' + (state.provider || 'auto');
+  try { const cached = sessionStorage.getItem(key); if (cached) return JSON.parse(cached); } catch {}
+  const data = await FxProviders.search(q, page, state.provider);
   try { sessionStorage.setItem(key, JSON.stringify(data)); } catch {}
   return data;
 }
@@ -373,7 +364,7 @@ async function runSearch(q, { append = false } = {}) {
   if (!q) { goHome(); return; }
   state.tab = 'search';
   const token = ++reqToken;
-  if (!append) { stopPlayback(); state.query = q; state.page = 1; state.results = []; state.pageCount = 1; }
+  if (!append) { stopPlayback(); state.query = q; state.page = 1; state.results = []; state.pageCount = 1; state.provider = null; }
   state.loading = true; state.error = null;
   syncTabs(); syncInput(); render();
   try {
@@ -383,6 +374,7 @@ async function runSearch(q, { append = false } = {}) {
     const fresh = (data.results || []).filter((r) => r && r.id && r.url && !known.has(r.id));
     state.results = state.results.concat(fresh);
     state.pageCount = data.page_count || 1;
+    state.provider = data.provider;
   } catch (e) {
     if (token !== reqToken) return;
     if (append) state.page--;
@@ -392,14 +384,14 @@ async function runSearch(q, { append = false } = {}) {
   }
 }
 function errorInfo(e) {
-  if (!navigator.onLine || (e && e.name === 'TypeError')) return { title: 'Sin conexión', text: 'Revisa tu internet e inténtalo otra vez.', offline: true };
+  if (!navigator.onLine) return { title: 'Sin conexión', text: 'Revisa tu internet e inténtalo otra vez.', offline: true };
   if (e && e.name === 'AbortError') return { title: 'Tardó demasiado', text: 'La búsqueda no respondió a tiempo. Inténtalo otra vez.' };
-  if (e && e.kind === 'rate') return { title: 'Muchas búsquedas seguidas', text: 'Openverse limita las búsquedas gratis. Espera un rato y vuelve a intentar.' };
-  return { title: 'No se pudo buscar', text: 'Openverse no respondió bien. Inténtalo de nuevo en un momento.' };
+  if (e && (e.kind === 'rate' || e.status === 429)) return { title: 'Muchas búsquedas seguidas', text: 'Openverse limita las búsquedas gratis. Espera un rato y vuelve a intentar.' };
+  return { title: 'No se pudo buscar', text: 'No se pudo acceder a los servicios de sonidos. Puede ser un bloqueo del servicio o un fallo de red. Inténtalo de nuevo.' };
 }
 function goHome() {
   reqToken++; stopPlayback();
-  Object.assign(state, { tab: 'search', query: '', results: [], page: 1, pageCount: 1, loading: false, error: null });
+  Object.assign(state, { tab: 'search', query: '', provider: null, results: [], page: 1, pageCount: 1, loading: false, error: null });
   syncTabs(); syncInput(); render();
 }
 
@@ -427,11 +419,12 @@ function viewHome() {
   return [
     h('div', { class: 'view-title' }, 'Categorías'),
     h('div', { class: 'tiles' }, tiles),
-    h('p', { class: 'tip' }, 'Los sonidos vienen de Openverse y funcionan mejor si buscas en inglés (dog, car, laser, drum…). Toca ♥ para guardar tus favoritos.')
+    h('p', { class: 'tip' }, 'Busca sonidos en Openverse, con Internet Archive como respaldo. Prueba lluvia, perro, rain o laser. Cada grabación conserva su autor y licencia.')
   ];
 }
 function viewResults() {
   const out = [h('div', { class: 'view-title' }, `Resultados: ${state.query}`)];
+  if (state.provider) out.push(h('p', { class: 'tip', style: 'margin:0 0 12px' }, state.provider === 'Internet Archive' ? 'Fuente: Internet Archive · Respaldo de búsqueda. Incluye grabaciones de campo; consulta la licencia de cada audio.' : 'Fuente: Openverse')); 
   if (state.loading && !state.results.length) {
     out.push(...Array.from({ length: 6 }, () => h('div', { class: 'skel', style: 'margin-bottom:8px' })));
     return out;
