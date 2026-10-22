@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Efectos de Sonido</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0F0A1F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Efectos">
+<meta name="description" content="Busca y reproduce efectos de sonido libres de Openverse.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+/* ===== Sistema de diseño ===== */
+:root{
+  --bg:#0F0A1F; --surface:#1A1330; --surface-2:#251B45; --line:rgba(255,255,255,.08);
+  --text:#F5F3FF; --muted:#A89FC8; --accent:#C026D3; --accent-2:#FB7185;
+  --grad:linear-gradient(135deg,#7C3AED 0%,#C026D3 55%,#FB7185 100%);
+  --ok:#34D399; --err:#FB7185;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px;
+  --r-sm:12px; --r-md:18px; --r-lg:26px;
+  --shadow:0 8px 24px rgba(0,0,0,.35);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Roboto,"Helvetica Neue",sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){
+  :root{
+    --bg:#F6F2FF; --surface:#FFFFFF; --surface-2:#EDE6FF; --line:rgba(40,20,90,.10);
+    --text:#1E1240; --muted:#6B5E92; --shadow:0 8px 24px rgba(80,40,160,.18);
+    color-scheme:light;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
+  background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased}
+body{height:100vh;height:100dvh;overflow:hidden;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;touch-action:manipulation}
+input{font:inherit;color:inherit}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.i.filled{fill:currentColor}
+::-webkit-scrollbar{display:none}
+
+/* ===== Estructura ===== */
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+header{padding:var(--s4) var(--s4) var(--s2);display:flex;flex-direction:column;gap:var(--s3)}
+.title-row{display:flex;align-items:center;justify-content:space-between}
+h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em}
+h1 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.icon-btn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--muted);transition:transform .12s,background .2s,color .2s}
+.icon-btn:active{transform:scale(.92)}
+.icon-btn.on{background:var(--grad);color:#fff}
+
+.search{position:relative;display:flex;align-items:center}
+.search svg.lead{position:absolute;left:14px;color:var(--muted);pointer-events:none}
+.search input{width:100%;height:48px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--surface);
+  padding:0 44px 0 44px;font-size:16px;outline:none;user-select:text;-webkit-user-select:text;-webkit-appearance:none;appearance:none}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(192,38,211,.25)}
+.search input::placeholder{color:var(--muted)}
+.search input::-webkit-search-cancel-button{display:none}
+.search .clear{position:absolute;right:2px;width:44px;height:44px;display:none;place-items:center;color:var(--muted)}
+.search.has-text .clear{display:grid}
+
+.chips{display:flex;gap:var(--s2);overflow-x:auto;padding:0 var(--s4) var(--s3);margin:0 calc(var(--s4) * -1);padding-left:var(--s4);scrollbar-width:none}
+.chip{flex:none;height:36px;padding:0 var(--s4);border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:600;color:var(--muted);transition:transform .12s}
+.chip:active{transform:scale(.95)}
+.chip.active{background:var(--grad);color:#fff;border-color:transparent}
+
+main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:var(--s2) var(--s4) var(--s6)}
+.view-title{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:var(--s2) 0 var(--s3)}
+
+/* ===== Inicio (categorías) ===== */
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s3)}
+.tile{position:relative;height:84px;border-radius:var(--r-md);padding:var(--s3) var(--s4);text-align:left;font-weight:800;font-size:17px;color:#fff;overflow:hidden;box-shadow:var(--shadow);transition:transform .12s;animation:rise .4s both}
+.tile:active{transform:scale(.96)}
+.tile::after{content:"";position:absolute;right:-18px;bottom:-22px;width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.18)}
+.tile small{display:block;font-weight:600;font-size:12px;opacity:.8;margin-top:2px}
+.tip{margin:var(--s5) 0 0;padding:var(--s4);border-radius:var(--r-md);background:var(--surface);font-size:14px;line-height:1.45;color:var(--muted)}
+
+/* ===== Lista ===== */
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s2)}
+.row{position:relative;display:flex;align-items:center;gap:var(--s3);padding:var(--s3);border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line);overflow:hidden;animation:rise .3s both}
+.row.playing{border-color:var(--accent);background:var(--surface-2)}
+.play{width:48px;height:48px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 4px 14px rgba(192,38,211,.4);transition:transform .12s}
+.play:active{transform:scale(.9)}
+.play svg{width:22px;height:22px}
+.play.fill svg{fill:#fff}
+.info{flex:1;min-width:0}
+.name{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{margin-top:2px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts{display:flex;flex:none}
+.acts .icon-btn{background:none;width:44px;height:44px}
+.acts .icon-btn.fav.on{background:none;color:var(--accent-2)}
+.bar{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--grad);transition:width .15s linear}
+.more{width:100%;height:50px;margin-top:var(--s4);border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line);font-weight:700;color:var(--text)}
+.more:active{background:var(--surface-2)}
+
+/* ===== Estados ===== */
+.state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--s3);padding:var(--s6) var(--s4);color:var(--muted);font-size:15px;line-height:1.45}
+.state strong{color:var(--text);font-size:18px}
+.state svg.big{width:56px;height:56px;color:var(--accent);opacity:.9}
+.state button.retry{height:44px;padding:0 var(--s6);border-radius:999px;background:var(--grad);color:#fff;font-weight:700}
+.skel{height:72px;border-radius:var(--r-md);background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%);background-size:200% 100%;animation:shine 1.2s infinite linear}
+
+/* ===== Barra inferior ===== */
+nav{display:flex;background:var(--surface);border-top:1px solid var(--line);padding:var(--s2) var(--s4) calc(var(--s2) + env(safe-area-inset-bottom))}
+nav button{flex:1;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:700;color:var(--muted);position:relative}
+nav button.active{color:var(--accent-2)}
+nav button .count{position:absolute;top:2px;left:calc(50% + 8px);min-width:18px;height:18px;border-radius:9px;background:var(--grad);color:#fff;font-size:11px;display:none;place-items:center;padding:0 5px}
+
+/* ===== Hoja inferior ===== */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--surface);border-radius:var(--r-lg) var(--r-lg) 0 0;
+  padding:var(--s3) var(--s5) calc(var(--s5) + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.9,.3,1);box-shadow:var(--shadow);max-height:85dvh;overflow-y:auto}
+.sheet.show{transform:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto var(--s4);background:var(--muted);opacity:.4}
+.sheet h2{margin:0 0 var(--s1);font-size:20px;line-height:1.25;word-break:break-word}
+.sheet .by{color:var(--muted);font-size:14px;margin-bottom:var(--s4)}
+.badges{display:flex;flex-wrap:wrap;gap:var(--s2);margin-bottom:var(--s4)}
+.badge{padding:6px 12px;border-radius:999px;background:var(--surface-2);font-size:12px;font-weight:700}
+.badge.lic{background:var(--grad);color:#fff}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2)}
+.act{min-height:50px;border-radius:var(--r-md);background:var(--surface-2);display:flex;align-items:center;justify-content:center;gap:var(--s2);font-weight:700;font-size:14px;text-decoration:none;color:var(--text);padding:0 var(--s3);text-align:center}
+.act:active{transform:scale(.97)}
+.attrib{margin:var(--s4) 0 0;font-size:12px;line-height:1.5;color:var(--muted);user-select:text;-webkit-user-select:text;word-break:break-word}
+
+/* ===== Aviso, toast, splash ===== */
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 12px);transform:translate(-50%,-20px);background:var(--text);color:var(--bg);padding:12px 18px;border-radius:999px;font-size:14px;font-weight:700;opacity:0;pointer-events:none;transition:all .25s;z-index:40;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.install{margin:0 var(--s4) var(--s2);padding:var(--s3) var(--s4);border-radius:var(--r-md);background:var(--surface-2);font-size:13px;line-height:1.4;display:none;align-items:center;gap:var(--s3)}
+.install.show{display:flex}
+.install span{flex:1}
+#splash{position:fixed;inset:0;z-index:99;background:var(--grad);display:grid;place-items:center;transition:opacity .4s}
+#splash img{width:96px;height:96px;border-radius:22px;box-shadow:0 12px 40px rgba(0,0,0,.35);animation:pop .6s both}
+#splash.hide{opacity:0;pointer-events:none}
+
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes shine{to{background-position:-200% 0}}
+@keyframes pop{from{transform:scale(.7);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="splash"><img src="icons/icon-192.png" alt=""></div>
+
+<div id="app">
+  <header>
+    <div class="title-row">
+      <h1>Efectos <span>de Sonido</span></h1>
+      <button class="icon-btn" id="loopBtn" aria-label="Repetir en bucle" aria-pressed="false"></button>
+    </div>
+    <form class="search" id="searchForm" role="search" autocomplete="off">
+      <span class="lead" id="searchLead"></span>
+      <input id="q" type="search" enterkeyhint="search" placeholder="Busca: dog, rain, laser…" aria-label="Buscar efectos de sonido" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" class="clear" id="clearBtn" aria-label="Borrar búsqueda"></button>
+    </form>
+  </header>
+  <div class="install" id="installHint"><span>Para instalarla: toca <b>Compartir</b> y luego <b>Añadir a pantalla de inicio</b>.</span><button class="icon-btn" id="installClose" aria-label="Cerrar aviso"></button></div>
+  <main id="main"></main>
+  <nav>
+    <button id="tabSearch" class="active" aria-label="Explorar"></button>
+    <button id="tabFavs" aria-label="Favoritos"></button>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<section class="sheet" id="sheet" aria-modal="true" role="dialog" aria-labelledby="sheetTitle"></section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ===== Constantes ===== */
+const APP_VERSION = '1.0.0';
+const API_URL = 'https://api.openverse.org/v1/audio/';
+const PAGE_SIZE = 20;
+const FAV_KEY = 'fx.favs.v1';
+const LOOP_KEY = 'fx.loop.v1';
+const HINT_KEY = 'fx.hint.v1';
+const CATEGORIES = [
+  ['Explosión','explosion'],['Lluvia','rain'],['Truenos','thunder'],['Risas','laugh'],
+  ['Aplausos','applause'],['Animales','animal'],['Puertas','door'],['Pasos','footsteps'],
+  ['Robot','robot'],['Alarma','alarm'],['Campana','bell'],['Magia','magic']
+];
+const ICONS = {
+  play:'<polygon points="6 3 20 12 6 21 6 3"/>',
+  pause:'<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  copy:'<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  share:'<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/>',
+  external:'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  wifiOff:'<path d="M12 20h.01"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/><path d="M5 12.86a10 10 0 0 1 5.17-2.69"/><path d="M19 12.86a10 10 0 0 0-2.01-1.53"/><path d="M2 8.82a15 15 0 0 1 4.18-2.65"/><path d="M22 8.82a15 15 0 0 0-11.29-3.76"/><path d="m2 2 20 20"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'
+};
+
+/* ===== Utilidades ===== */
+const $ = (id) => document.getElementById(id);
+function icon(name, cls = '') {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('class', 'i ' + cls);
+  s.setAttribute('aria-hidden', 'true');
+  s.innerHTML = ICONS[name];            // contenido estático propio, nunca datos externos
+  return s;
+}
+function h(tag, props = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'style') el.style.cssText = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+function fmtTime(ms) {
+  if (!ms || ms < 0) return '--:--';
+  const s = Math.round(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function licenseLabel(it) {
+  if (!it.license) return 'Licencia libre';
+  const v = it.license_version ? ' ' + it.license_version : '';
+  return (it.license.toUpperCase() + v).trim();
+}
+function safeUrl(u) { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } }
+function store(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function load(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
+let toastTimer;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+function buzz(ms = 10) { try { navigator.vibrate && navigator.vibrate(ms); } catch {} }
+
+/* ===== Estado ===== */
+const state = {
+  tab: 'search',        // search | favs
+  query: '',
+  page: 1,
+  pageCount: 1,
+  results: [],
+  loading: false,
+  error: null,          // {title, text, offline}
+  favs: load(FAV_KEY, []),
+  loop: load(LOOP_KEY, false),
+  playingId: null,
+  sheetItem: null
+};
+let reqToken = 0;
+
+/* ===== Audio ===== */
+const audio = new Audio();
+audio.preload = 'none';
+audio.loop = state.loop;
+audio.addEventListener('timeupdate', () => {
+  const bar = document.querySelector('.row.playing .bar');
+  if (bar && audio.duration) bar.style.width = Math.min(100, (audio.currentTime / audio.duration) * 100) + '%';
+});
+audio.addEventListener('ended', () => { if (!audio.loop) stopPlayback(); });
+audio.addEventListener('pause', () => { if (!audio.ended && state.playingId) syncPlayState(); });
+audio.addEventListener('playing', syncPlayState);
+audio.addEventListener('error', () => {
+  if (!state.playingId) return;
+  toast('No se pudo reproducir este sonido');
+  stopPlayback();
+});
+
+async function togglePlay(item) {
+  buzz();
+  if (state.playingId === item.id && !audio.paused) { stopPlayback(); return; }
+  const src = safeUrl(item.url);
+  if (!src) { toast('Este sonido no tiene un enlace válido'); return; }
+  try {
+    audio.pause();
+    audio.src = src;
+    audio.loop = state.loop;
+    state.playingId = item.id;
+    syncPlayState();
+    await audio.play();
+    setMediaSession(item);
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;   // el usuario tocó otro sonido rápido
+    toast('No se pudo reproducir este sonido');
+    stopPlayback();
+  }
+}
+function stopPlayback() {
+  audio.pause();
+  try { audio.currentTime = 0; } catch {}
+  state.playingId = null;
+  syncPlayState();
+}
+function syncPlayState() {
+  document.querySelectorAll('.row').forEach((row) => {
+    const on = row.dataset.id === state.playingId;
+    row.classList.toggle('playing', on);
+    const btn = row.querySelector('.play');
+    btn.replaceChildren(icon(on ? 'pause' : 'play'));
+    btn.setAttribute('aria-label', (on ? 'Detener ' : 'Reproducir ') + row.dataset.title);
+    if (!on) row.querySelector('.bar').style.width = '0';
+  });
+}
+function setMediaSession(item) {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: item.title || 'Efecto de sonido', artist: item.creator || 'Openverse' });
+    navigator.mediaSession.setActionHandler('pause', stopPlayback);
+  } catch {}
+}
+
+/* ===== Favoritos ===== */
+const isFav = (id) => state.favs.some((f) => f.id === id);
+function slim(it) {
+  return { id: it.id, title: it.title, url: it.url, creator: it.creator, duration: it.duration, license: it.license,
+    license_version: it.license_version, foreign_landing_url: it.foreign_landing_url, attribution: it.attribution, source: it.source };
+}
+function toggleFav(item) {
+  buzz(15);
+  if (isFav(item.id)) { state.favs = state.favs.filter((f) => f.id !== item.id); toast('Quitado de favoritos'); }
+  else { state.favs = [slim(item), ...state.favs]; toast('Guardado en favoritos'); }
+  store(FAV_KEY, state.favs);
+  updateBadge();
+  if (state.tab === 'favs') render(); else refreshFavButtons();
+  if (state.sheetItem && state.sheetItem.id === item.id) renderSheet(item);
+}
+function refreshFavButtons() {
+  document.querySelectorAll('.row').forEach((row) => {
+    const b = row.querySelector('.fav'); const on = isFav(row.dataset.id);
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+    b.firstChild.classList.toggle('filled', on);
+  });
+}
+function updateBadge() {
+  const n = state.favs.length;
+  const tab = $('tabFavs'); tab.replaceChildren(icon('heart', n ? 'filled' : ''), 'Favoritos');
+  if (n) tab.append(h('span', { class: 'count', style: 'display:grid' }, n > 99 ? '99+' : n));
+}
+
+/* ===== Búsqueda (API Openverse) ===== */
+function cacheKey(q, page) { return 'fx.q.' + q.toLowerCase() + '|' + page; }
+async function fetchPage(q, page) {
+  const key = cacheKey(q, page);
+  try { const c = sessionStorage.getItem(key); if (c) return JSON.parse(c); } catch {}
+  const params = new URLSearchParams({ q, category: 'sound_effect', page_size: PAGE_SIZE, page });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  let res;
+  try { res = await fetch(API_URL + '?' + params, { signal: ctrl.signal, headers: { Accept: 'application/json' } }); }
+  finally { clearTimeout(timer); }
+  if (res.status === 429) { const e = new Error('rate'); e.kind = 'rate'; throw e; }
+  if (res.status === 401 || res.status === 403) { const e = new Error('auth'); e.kind = 'auth'; throw e; }
+  if (!res.ok) { const e = new Error('http ' + res.status); e.kind = 'http'; throw e; }
+  const data = await res.json();
+  try { sessionStorage.setItem(key, JSON.stringify(data)); } catch {}
+  return data;
+}
+async function runSearch(q, { append = false } = {}) {
+  q = q.trim();
+  if (!q) { goHome(); return; }
+  state.tab = 'search';
+  const token = ++reqToken;
+  if (!append) { stopPlayback(); state.query = q; state.page = 1; state.results = []; state.pageCount = 1; }
+  state.loading = true; state.error = null;
+  syncTabs(); syncInput(); render();
+  try {
+    const data = await fetchPage(q, state.page);
+    if (token !== reqToken) return;
+    const known = new Set(state.results.map((r) => r.id));
+    const fresh = (data.results || []).filter((r) => r && r.id && r.url && !known.has(r.id));
+    state.results = state.results.concat(fresh);
+    state.pageCount = data.page_count || 1;
+  } catch (e) {
+    if (token !== reqToken) return;
+    if (append) state.page--;
+    state.error = errorInfo(e);
+  } finally {
+    if (token === reqToken) { state.loading = false; render(append); }
+  }
+}
+function errorInfo(e) {
+  if (!navigator.onLine || (e && e.name === 'TypeError')) return { title: 'Sin conexión', text: 'Revisa tu internet e inténtalo otra vez.', offline: true };
+  if (e && e.name === 'AbortError') return { title: 'Tardó demasiado', text: 'La búsqueda no respondió a tiempo. Inténtalo otra vez.' };
+  if (e && e.kind === 'rate') return { title: 'Muchas búsquedas seguidas', text: 'Openverse limita las búsquedas gratis. Espera un rato y vuelve a intentar.' };
+  return { title: 'No se pudo buscar', text: 'Openverse no respondió bien. Inténtalo de nuevo en un momento.' };
+}
+function goHome() {
+  reqToken++; stopPlayback();
+  Object.assign(state, { tab: 'search', query: '', results: [], page: 1, pageCount: 1, loading: false, error: null });
+  syncTabs(); syncInput(); render();
+}
+
+/* ===== Render ===== */
+function syncInput() {
+  const q = $('q'); if (document.activeElement !== q || !q.value) q.value = state.query;
+  $('searchForm').classList.toggle('has-text', !!q.value);
+}
+function syncTabs() {
+  $('tabSearch').classList.toggle('active', state.tab === 'search');
+  $('tabFavs').classList.toggle('active', state.tab === 'favs');
+}
+function render(keepScroll = false) {
+  const main = $('main'); const top = main.scrollTop;
+  main.replaceChildren(...(state.tab === 'favs' ? viewFavs() : state.query ? viewResults() : viewHome()));
+  if (keepScroll) main.scrollTop = top; else main.scrollTop = 0;
+  syncPlayState();
+}
+function viewHome() {
+  const tiles = CATEGORIES.map(([label, q], i) => {
+    const hue = (i * 30 + 270) % 360;
+    return h('button', { class: 'tile', style: `background:linear-gradient(135deg,hsl(${hue} 70% 42%),hsl(${(hue + 45) % 360} 80% 56%));animation-delay:${i * 30}ms`, onclick: () => runSearch(q) },
+      label, h('small', {}, q));
+  });
+  return [
+    h('div', { class: 'view-title' }, 'Categorías'),
+    h('div', { class: 'tiles' }, tiles),
+    h('p', { class: 'tip' }, 'Los sonidos vienen de Openverse y funcionan mejor si buscas en inglés (dog, car, laser, drum…). Toca ♥ para guardar tus favoritos.')
+  ];
+}
+function viewResults() {
+  const out = [h('div', { class: 'view-title' }, `Resultados: ${state.query}`)];
+  if (state.loading && !state.results.length) {
+    out.push(...Array.from({ length: 6 }, () => h('div', { class: 'skel', style: 'margin-bottom:8px' })));
+    return out;
+  }
+  if (state.error && !state.results.length) { out.push(errorState()); return out; }
+  if (!state.results.length) {
+    out.push(h('div', { class: 'state' }, icon('music', 'big'), h('strong', {}, 'Sin resultados'), 'Prueba con otra palabra, mejor en inglés.'));
+    return out;
+  }
+  out.push(h('ul', { class: 'list' }, state.results.map((it, i) => row(it, i))));
+  if (state.error) out.push(h('p', { class: 'tip' }, state.error.title + '. ' + state.error.text));
+  if (state.loading) out.push(h('div', { class: 'skel', style: 'margin-top:8px' }));
+  else if (state.page < state.pageCount) out.push(h('button', { class: 'more', onclick: () => { state.page++; runSearch(state.query, { append: true }); } }, 'Cargar más'));
+  return out;
+}
+function viewFavs() {
+  const out = [h('div', { class: 'view-title' }, 'Favoritos')];
+  if (!state.favs.length) {
+    out.push(h('div', { class: 'state' }, icon('heart', 'big'), h('strong', {}, 'Aún no tienes favoritos'), 'Toca el corazón en cualquier sonido para guardarlo aquí.'));
+    return out;
+  }
+  out.push(h('ul', { class: 'list' }, state.favs.map((it, i) => row(it, i))));
+  return out;
+}
+function errorState() {
+  const e = state.error;
+  return h('div', { class: 'state' }, icon(e.offline ? 'wifiOff' : 'music', 'big'), h('strong', {}, e.title), e.text,
+    h('button', { class: 'retry', onclick: () => runSearch(state.query) }, 'Reintentar'));
+}
+function row(it, i) {
+  const fav = isFav(it.id);
+  const title = it.title || 'Sin título';
+  return h('li', { class: 'row', 'data-id': it.id, 'data-title': title, style: `animation-delay:${Math.min(i, 10) * 25}ms` },
+    h('button', { class: 'play fill', 'aria-label': 'Reproducir ' + title, onclick: () => togglePlay(it) }, icon('play')),
+    h('div', { class: 'info', onclick: () => togglePlay(it) },
+      h('div', { class: 'name' }, title),
+      h('div', { class: 'meta' }, [fmtTime(it.duration), it.creator || 'Autor desconocido', licenseLabel(it)].join(' · '))),
+    h('div', { class: 'acts' },
+      h('button', { class: 'icon-btn fav' + (fav ? ' on' : ''), 'aria-label': 'Favorito', 'aria-pressed': fav, onclick: () => toggleFav(it) }, icon('heart', fav ? 'filled' : '')),
+      h('button', { class: 'icon-btn', 'aria-label': 'Detalles y licencia', onclick: () => openSheet(it) }, icon('info'))),
+    h('div', { class: 'bar' }));
+}
+
+/* ===== Hoja de detalles ===== */
+function attributionText(it) {
+  if (it.attribution) return it.attribution;
+  return `"${it.title || 'Sin título'}"${it.creator ? ' por ' + it.creator : ''} (${licenseLabel(it)}) vía Openverse.`;
+}
+function openSheet(it) { state.sheetItem = it; renderSheet(it); $('scrim').classList.add('show'); $('sheet').classList.add('show'); }
+function closeSheet() { state.sheetItem = null; $('scrim').classList.remove('show'); $('sheet').classList.remove('show'); }
+function renderSheet(it) {
+  const landing = safeUrl(it.foreign_landing_url);
+  const src = safeUrl(it.url);
+  const att = attributionText(it);
+  const acts = [
+    h('button', { class: 'act', onclick: () => toggleFav(it) }, icon('heart', isFav(it.id) ? 'filled' : ''), isFav(it.id) ? 'En favoritos' : 'Favorito'),
+    h('button', { class: 'act', onclick: async () => { try { await navigator.clipboard.writeText(att); toast('Atribución copiada'); } catch { toast('No se pudo copiar'); } } }, icon('copy'), 'Copiar crédito')
+  ];
+  if (navigator.share && (landing || src)) acts.push(h('button', { class: 'act', onclick: async () => { try { await navigator.share({ title: it.title || 'Efecto de sonido', url: landing || src }); } catch {} } }, icon('share'), 'Compartir'));
+  if (src) acts.push(h('a', { class: 'act', href: src, target: '_blank', rel: 'noopener noreferrer' }, icon('download'), 'Abrir audio'));
+  if (landing) acts.push(h('a', { class: 'act', href: landing, target: '_blank', rel: 'noopener noreferrer' }, icon('external'), 'Página original'));
+  $('sheet').replaceChildren(
+    h('div', { class: 'grab' }),
+    h('h2', { id: 'sheetTitle' }, it.title || 'Sin título'),
+    h('div', { class: 'by' }, it.creator ? 'por ' + it.creator : 'Autor desconocido'),
+    h('div', { class: 'badges' }, h('span', { class: 'badge lic' }, licenseLabel(it)), h('span', { class: 'badge' }, fmtTime(it.duration)), it.source ? h('span', { class: 'badge' }, it.source) : null),
+    h('div', { class: 'actions' }, acts),
+    h('p', { class: 'attrib' }, att));
+}
+
+/* ===== Eventos ===== */
+$('searchLead').replaceChildren(icon('search'));
+$('searchLead').className = 'lead';
+$('searchLead').style.cssText = 'position:absolute;left:14px;color:var(--muted);pointer-events:none;display:grid';
+$('clearBtn').replaceChildren(icon('x'));
+$('installClose').replaceChildren(icon('x'));
+$('tabSearch').replaceChildren(icon('search'), 'Explorar');
+updateBadge();
+
+function syncLoopBtn() {
+  const b = $('loopBtn'); b.replaceChildren(icon('repeat'));
+  b.classList.toggle('on', state.loop); b.setAttribute('aria-pressed', state.loop);
+}
+syncLoopBtn();
+$('loopBtn').addEventListener('click', () => {
+  state.loop = !state.loop; audio.loop = state.loop; store(LOOP_KEY, state.loop); syncLoopBtn();
+  toast(state.loop ? 'Bucle activado' : 'Bucle desactivado'); buzz();
+});
+$('searchForm').addEventListener('submit', (e) => { e.preventDefault(); $('q').blur(); runSearch($('q').value); });
+$('q').addEventListener('input', () => $('searchForm').classList.toggle('has-text', !!$('q').value));
+$('clearBtn').addEventListener('click', () => { $('q').value = ''; goHome(); });
+$('tabSearch').addEventListener('click', () => { if (state.tab === 'search') { $('main').scrollTo({ top: 0, behavior: 'smooth' }); return; } state.tab = 'search'; syncTabs(); render(); });
+$('tabFavs').addEventListener('click', () => { state.tab = 'favs'; syncTabs(); render(); });
+$('scrim').addEventListener('click', closeSheet);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+
+/* Aviso de instalación (solo iPhone/iPad en Safari, una vez) */
+(function installHint() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  if (!ios || standalone || load(HINT_KEY, false)) return;
+  $('installHint').classList.add('show');
+  $('installClose').addEventListener('click', () => { $('installHint').classList.remove('show'); store(HINT_KEY, true); });
+})();
+
+/* ===== Auto-actualización ===== */
+(function setupUpdates() {
+  if (!('serviceWorker' in navigator)) return;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return; reloading = true;
+    toast('Actualizando…'); stopPlayback();
+    setTimeout(() => location.reload(), 600);
+  });
+  async function checkVersion(reg) {
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const { version } = await r.json();
+      if (version && version !== APP_VERSION) {
+        await reg.update();
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+    } catch {}
+  }
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    const tick = () => { reg.update().catch(() => {}); checkVersion(reg); };
+    tick();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') tick(); });
+    setInterval(tick, 30 * 60 * 1000);
+  }).catch(() => {});
+})();
+
+/* ===== Inicio ===== */
+render();
+window.addEventListener('load', () => setTimeout(() => $('splash').classList.add('hide'), 500));
+setTimeout(() => $('splash').classList.add('hide'), 2500);
+</script>
+</body>
+</html>
